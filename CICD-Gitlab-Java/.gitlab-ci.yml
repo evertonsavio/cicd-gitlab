@@ -1,7 +1,17 @@
 stages:
+  - test
 #  - build jar
 #  - build and push docker image
-  - deploy
+#  - deploy
+
+build:
+  image: maven:3.6.3-jdk-11-slim
+  stage: test
+  before_script:
+    - source .${CI_COMMIT_REF_NAME}.env
+  script:
+    - mvn clean test -Dspring.profiles.active=$SPRING_ACTIVE_PROFILE
+
 #build:
 #  image: maven:3.6.3-jdk-11-slim
 #  stage: build jar
@@ -42,16 +52,16 @@ stages:
 #    - chmod 700 ~/.ssh
 #    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
 #    - source .${CI_COMMIT_REF_NAME}.env
-deploy:
-  image: alpine:latest
-  stage: deploy
-  before_script:
-    - chmod og= $DEV_SSH_PRIVATE_KEY
-    - apk update && apk add openssh-client
-    #- chmod 600 $DEV_SSH_PRIVATE_KEY
-    - echo $DEV_SSH_PRIVATE_KEY
-    - cat $DEV_SSH_PRIVATE_KEY
-    - source .${CI_COMMIT_REF_NAME}.env
-  script:
-    - ssh deployer@172.31.1.70 -i $DEV_SSH_PRIVATE_KEY -o StrictHostKeyChecking=no "docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY; docker stop $APP_NAME; docker system prune -a -f; docker pull $DOCKER_REPO; docker container run -d --name $APP_NAME -p $PORT:8080 -e SPRING_PROFILES_ACTIVE=$SPRING_ACTIVE_PROFILE $DOCKER_REPO; docker logout"
-    - ssh deployer@172.31.1.70 -i $DEV_SSH_PRIVATE_KEY -o StrictHostKeyChecking=no "docker-compose up -d;"
+#deploy:
+#  image: alpine:latest
+#  stage: deploy
+#  before_script:
+#    - chmod og= $DEV_SSH_PRIVATE_KEY
+#    - apk update && apk add openssh-client
+#    #- chmod 600 $DEV_SSH_PRIVATE_KEY
+#    - echo $DEV_SSH_PRIVATE_KEY
+#    - cat $DEV_SSH_PRIVATE_KEY
+#    - source .${CI_COMMIT_REF_NAME}.env
+#  script:
+#    - ssh deployer@172.31.1.70 -i $DEV_SSH_PRIVATE_KEY -o StrictHostKeyChecking=no "docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY; docker stop $APP_NAME; docker system prune -a -f; docker pull $DOCKER_REPO; docker container run -d --name $APP_NAME -p $PORT:8080 -e SPRING_PROFILES_ACTIVE=$SPRING_ACTIVE_PROFILE $DOCKER_REPO; docker logout"
+#    - ssh deployer@172.31.1.70 -i $DEV_SSH_PRIVATE_KEY -o StrictHostKeyChecking=no "docker-compose up -d;"
