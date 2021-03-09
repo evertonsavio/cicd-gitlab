@@ -1,0 +1,57 @@
+stages:
+#  - build jar
+#  - build and push docker image
+  - deploy
+#build:
+#  image: maven:3.6.3-jdk-11-slim
+#  stage: build jar
+#  before_script:
+#    - source .${CI_COMMIT_REF_NAME}.env
+#  script:
+#    - mvn clean install -Dspring.profiles.active=$SPRING_ACTIVE_PROFILE && mvn package -B -e -Dspring.profiles.active=$SPRING_ACTIVE_PROFILE
+#  artifacts:
+#    paths:
+#      - target/*.jar
+#docker build:
+#  image: docker:stable
+#  stage: build and push docker image
+#  services:
+#    - name: docker:dind
+#      entrypoint: [ "env", "-u", "DOCKER_HOST" ]
+#      command: [ "dockerd-entrypoint.sh" ]
+#  variables:
+#    DOCKER_HOST: tcp://docker:2375/
+#    DOCKER_DRIVER: overlay2
+#    # See https://github.com/docker-library/docker/pull/166
+#    DOCKER_TLS_CERTDIR: ""
+#
+#  before_script:
+#    - source .${CI_COMMIT_REF_NAME}.env
+#  script:
+#    - docker build --build-arg SPRING_ACTIVE_PROFILE=$SPRING_ACTIVE_PROFILE -t $DOCKER_REPO .
+#    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+#    - docker push $DOCKER_REPO
+#deploy:
+#  image: ubuntu:latest
+#  stage: deploy
+#  before_script:
+#    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+#    - eval $(ssh-agent -s)
+#    - echo "$DEV_SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+#    - mkdir -p ~/.ssh
+#    - chmod 700 ~/.ssh
+#    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+#    - source .${CI_COMMIT_REF_NAME}.env
+deploy:
+  image: alpine:latest
+  stage: deploy
+  before_script:
+    - chmod og= $DEV_SSH_PRIVATE_KEY
+    - apk update && apk add openssh-client
+    #- chmod 600 $DEV_SSH_PRIVATE_KEY
+    - echo $DEV_SSH_PRIVATE_KEY
+    - cat $DEV_SSH_PRIVATE_KEY
+    - source .${CI_COMMIT_REF_NAME}.env
+  script:
+    - ssh deployer@172.31.1.70 -i $DEV_SSH_PRIVATE_KEY -o StrictHostKeyChecking=no "docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY; docker stop $APP_NAME; docker system prune -a -f; docker pull $DOCKER_REPO; docker container run -d --name $APP_NAME -p $PORT:8080 -e SPRING_PROFILES_ACTIVE=$SPRING_ACTIVE_PROFILE $DOCKER_REPO; docker logout"
+    - ssh deployer@172.31.1.70 -i $DEV_SSH_PRIVATE_KEY -o StrictHostKeyChecking=no "docker-compose up -d;"
